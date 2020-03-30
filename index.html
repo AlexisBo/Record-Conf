@@ -1,0 +1,190 @@
+<head>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
+    <link href="css/custom.css" rel="stylesheet" type="text/css">
+    <script src="https://code.jquery.com/jquery-3.4.1.slim.min.js" integrity="sha384-J6qa4849blE2+poT4WnyKhv5vZF5SrPo0iEjwBvKU7imGFAV0wwj1yYfoRSJoZ+n" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js" integrity="sha384-wfSDF2E50Y2D1uUdj0O3uMBJnjuUD4Ih7YwaYd1iqfktj0Uod8GCExl3Og8ifwB6" crossorigin="anonymous"></script>
+</head>
+<style>
+    html, body {
+        margin: 0!important;
+        padding: 0!important;
+        text-align: center;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+        font-size: 1em;
+    }
+
+    video {
+        width: 100%;
+        border-radius: 5px;
+        border: 1px solid black;
+    }
+</style>
+
+<title>UEVE Record</title>
+
+<body>
+    <div class="container">
+        <input src="images/test.jpg" style="height:200px ; width: 400px; margin-bottom: -40px;" type="image"> </input> 
+
+        <h1>Enregistrez votre cours et votre webcam</h1>
+        <div class="row" style="padding-right: 70px;">
+            <div class="col-md-1">
+                <div class="row">
+                    <input class="ml-auto" style="width: 90px; height: 90px;" src="images/record2.png" onclick="start()" type="image"> </input>
+                </div>
+                <div class="row" style="margin-top: 30px;">
+                    <input class="ml-auto" style="width: 90px; height: 90px;" src="images/stop2.png" onclick="window.stopCallback()" type="image"></input>
+                </div>
+                <div class="row" style="margin-top: 30px;">
+                    <a class="ml-auto"  href="../record-your-course-timesheets/record_your_course.html ">
+                        <input style="width: 90px; height: 90px; margin-left: 2px;" src="images/play2.png"  type="image"></input>
+                    </a>
+                </div>
+            </div>
+            <div class="col-md-11">
+                <video controls autoplay playsinline style="width: 100%; float: left;"></video>
+            </div>
+        </div>
+    </div>
+</body>
+
+<!-- <button onclick="start()">Démarer</button></div> -->
+
+<script src="https://cdn.webrtc-experiment.com/RecordRTC.js"></script>
+<script src="https://webrtc.github.io/adapter/adapter-latest.js"></script>
+<script>
+if(!navigator.getDisplayMedia && !navigator.mediaDevices.getDisplayMedia) {
+    var error = 'Your browser does NOT supports getDisplayMedia API.';
+    document.querySelector('h1').innerHTML = error;
+
+    document.querySelector('video').style.display = 'none';
+    document.getElementById('btn-start-recording').style.display = 'none';
+    document.getElementById('btn-stop-recording').style.display = 'none';
+    throw new Error(error);
+}
+
+function invokeGetDisplayMedia(success, error) {
+    var displaymediastreamconstraints = {
+        video: {
+            displaySurface: 'monitor', // monitor, window, application, browser
+            logicalSurface: true,
+            cursor: 'always' // never, always, motion
+        }
+    };
+
+    // above constraints are NOT supported YET
+    // that's why overridnig them
+    displaymediastreamconstraints = {
+        video: true
+    };
+
+    if(navigator.mediaDevices.getDisplayMedia) {
+        navigator.mediaDevices.getDisplayMedia(displaymediastreamconstraints).then(success).catch(error);
+    }
+    else {
+        navigator.getDisplayMedia(displaymediastreamconstraints).then(success).catch(error);
+    }
+}
+
+function captureScreen(callback) {
+    invokeGetDisplayMedia(function(screen) {
+        addStreamStopListener(screen, function() {
+            if(window.stopCallback) {
+                window.stopCallback();
+            }
+
+        });
+        callback(screen);
+    }, function(error) {
+        console.error(error);
+        alert('Unable to capture your screen. Please check console logs.\n' + error);
+    });
+}
+
+function captureCamera(cb) {
+    navigator.mediaDevices.getUserMedia({audio: true, video: true}).then(cb);
+}
+
+function keepStreamActive(stream) {
+    var video = document.createElement('video');
+    video.muted = true;
+    video.srcObject = stream;
+    video.style.display = 'none';
+    (document.body || document.documentElement).appendChild(video);
+}
+
+function start(){
+captureScreen(function(screen) {
+    keepStreamActive(screen);
+    captureCamera(function(camera) {
+        keepStreamActive(camera);
+
+        screen.width = window.screen.width;
+        screen.height = window.screen.height;
+        screen.fullcanvas = true;
+
+        camera.width = 320;
+        camera.height = 240;
+        camera.top = screen.height - camera.height;
+        camera.left = screen.width - camera.width;
+
+        var recorder = RecordRTC([screen, camera], {
+            type: 'video',
+            mimeType: 'video/webm',
+            previewStream: function(s) {
+                document.querySelector('video').muted = true;
+                document.querySelector('video').srcObject = s;
+            }
+        });
+
+        recorder.startRecording();
+
+        window.stopCallback = function() {
+            window.stopCallback = null;
+
+            recorder.stopRecording(function() {
+                var blob = recorder.getBlob();
+                invokeSaveAsDialog(blob); 
+                document.querySelector('video').srcObject = null;
+                document.querySelector('video').src = URL.createObjectURL(blob);
+                document.querySelector('video').muted = false;
+
+                [screen, camera].forEach(function(stream) {
+                    stream.getTracks().forEach(function(track) {
+                        track.stop();
+                    });
+                });
+            })
+           
+        };
+        
+
+        //window.timeout = setTimeout(window.stopCallback, 10 * 1000);
+    });
+});
+}
+function addStreamStopListener(stream, callback) {
+    stream.addEventListener('ended', function() {
+        callback();
+        callback = function() {};
+    }, false);
+    stream.addEventListener('inactive', function() {
+        callback();
+        callback = function() {};
+    }, false);
+    stream.getTracks().forEach(function(track) {
+        track.addEventListener('ended', function() {
+            callback();
+            callback = function() {};
+        }, false);
+        track.addEventListener('inactive', function() {
+            callback();
+            callback = function() {};
+        }, false);
+    });
+}
+</script>
+
+<footer style="margin-top: 20px; text-align: left;"><small id="send-message"></small></footer>
+<script src="https://cdn.webrtc-experiment.com/common.js"></script>
